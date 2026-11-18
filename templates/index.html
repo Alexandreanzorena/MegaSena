@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mega-Sena Lab · Estudo de Machine Learning</title>
+<style>
+:root{--bg:#0f1419;--card:#18202a;--line:#2a3441;--tx:#e6edf3;--mut:#8b98a8;--ac:#2ea36b;--ac2:#4c8dff;--warn:#e0a82e;--bad:#e5534b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 Segoe UI,Arial,sans-serif}
+.wrap{max-width:1050px;margin:0 auto;padding:20px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:0 0 12px}
+.sub{color:var(--mut);margin-bottom:14px}
+.aviso{background:#2b2410;border:1px solid #5b4a14;color:#f1d98a;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.step{display:inline-block;background:var(--ac);color:#04140c;border-radius:50%;width:24px;height:24px;text-align:center;font-weight:700;margin-right:8px;line-height:24px}
+label{display:block;font-size:13px;color:var(--mut);margin-bottom:4px}
+input,select{background:#0f1419;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px}
+button{background:var(--ac);color:#04140c;border:0;border-radius:8px;padding:9px 16px;font-weight:700;cursor:pointer;font-size:14px}
+button.sec{background:#243040;color:var(--tx)}button:disabled{opacity:.5;cursor:wait}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.bar{height:8px;background:#0f1419;border-radius:6px;overflow:hidden;margin:10px 0;display:none}
+.bar i{display:block;height:100%;width:0;background:var(--ac2);transition:width .3s}
+.msg{color:var(--mut);font-size:13px;min-height:18px}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:10px 0}
+.kv div{background:#0f1419;border:1px solid var(--line);border-radius:8px;padding:10px}
+.kv b{display:block;font-size:18px}.kv span{color:var(--mut);font-size:12px}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:13px;font-weight:700}
+.b-ok{background:#12301f;color:#6fe3a3}.b-no{background:#33260c;color:#f1c75e}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--mut);font-weight:600;font-size:12px}
+.ball{display:inline-block;width:30px;height:30px;line-height:30px;border-radius:50%;background:#1f6f4a;color:#fff;text-align:center;font-weight:700;font-size:13px;margin-right:4px}
+canvas{width:100%;height:200px;background:#0f1419;border:1px solid var(--line);border-radius:8px}
+.hide{display:none}.small{font-size:12px;color:var(--mut)}
+.err{color:var(--bad)}
+.imp{display:grid;grid-template-columns:170px 1fr 50px;gap:8px;align-items:center;font-size:13px;margin:3px 0}
+.imp i{display:block;height:8px;background:var(--ac2);border-radius:4px}
+</style>
+</head>
+<body><div class="wrap">
+<h1>Mega-Sena Lab</h1>
+<div class="sub">Importe o histórico, treine o modelo, valide contra o acaso e gere previsões para estudo.</div>
+<div class="aviso"><b>Uso educacional.</b> A Mega-Sena é um sorteio aleatório e independente: nenhum modelo aumenta de forma consistente a chance de ganhar. O app mostra isso com testes estatísticos (AUC contra embaralhamento, acertos vs. 0,6 esperado e backtest de ROI). As "previsões" são jogos de estudo, não recomendação de aposta.</div>
+
+<div class="card"><h2><span class="step">1</span>Importar histórico (.xlsx)</h2>
+<div class="row"><input type="file" id="arq" accept=".xlsx,.xls" style="max-width:380px"><button id="bUp">Importar</button></div>
+<div class="msg" id="mUp">Precisa das colunas Bola1…Bola6. Colunas Concurso, Data e Rateio 4/5/6 acertos são aproveitadas quando existem.</div>
+<div id="infoUp"></div></div>
+
+<div class="card"><h2><span class="step">2</span>Treinar e validar o modelo</h2>
+<div class="grid">
+<div><label>Modelo</label><select id="modelo"><option value="rf">Random Forest (atraso, frequência, ciclo, quadrantes)</option><option value="mlp">Rede neural (janela de 20 concursos)</option></select></div>
+<div><label>Árvores (Random Forest)</label><input type="number" id="arvores" value="100" min="10" max="400"></div>
+<div><label>Concursos de validação (fora do treino)</label><input type="number" id="holdout" value="500" min="100" max="1500"></div>
+</div>
+<button id="bTr" disabled>Treinar</button>
+<div class="bar" id="barTr"><i></i></div><div class="msg" id="mTr"></div>
+<div id="resTr"></div></div>
+
+<div class="card"><h2><span class="step">3</span>Gerar previsões para estudo</h2>
+<div class="grid">
+<div><label>Quantidade de jogos (1–1000)</label><input type="number" id="qtd" value="10" min="1" max="1000"></div>
+<div><label>Intensidade do modelo (0 = aleatório)</label><input type="number" id="int" value="1" min="0" max="30" step="0.5"></div>
+<div><label>Soma mínima (percentil)</label><input type="number" id="smin" value="10" min="0" max="50"></div>
+<div><label>Soma máxima (percentil)</label><input type="number" id="smax" value="90" min="50" max="100"></div>
+<div><label>Pares mín.</label><input type="number" id="pmin" value="2" min="0" max="6"></div>
+<div><label>Pares máx.</label><input type="number" id="pmax" value="4" min="0" max="6"></div>
+<div><label>Semente (opcional)</label><input type="text" id="seed" placeholder="reprodutível"></div>
+</div>
+<div class="row"><button id="bPr" disabled>Gerar previsões</button>
+<button class="sec" id="bCsv" disabled>Baixar CSV</button><button class="sec" id="bXls" disabled>Baixar XLSX</button><button class="sec" id="bCp" disabled>Copiar</button></div>
+<div class="small" style="margin-top:6px">Sem modelo treinado, os jogos saem aleatórios (com os mesmos filtros). Como as probabilidades do modelo ficam perto de 10% para todas as dezenas, a intensidade alta só aumenta o ruído.</div>
+<div id="resPr" style="margin-top:12px"></div></div>
+
+<div class="card"><h2><span class="step">4</span>Backtest de ROI (simulação histórica)</h2>
+<div class="grid">
+<div><label>Últimos N anos</label><input type="number" id="anos" value="5" min="1" max="15"></div>
+<div><label>Jogos por concurso</label><input type="number" id="jogos" value="5" min="1" max="30"></div>
+<div><label>Preço da aposta (R$)</label><input type="number" id="preco" value="6" min="0.5" step="0.5"></div>
+<div><label>Semente do sorteio dos jogos</label><input type="number" id="bseed" value="7" min="1"></div>
+<div><label>Modelo</label><select id="bmodelo"><option value="rf">Random Forest</option><option value="mlp">Rede neural</option></select></div>
+</div>
+<button id="bBt" disabled>Rodar backtest</button>
+<div class="bar" id="barBt"><i></i></div><div class="msg" id="mBt"></div>
+<div id="resBt"></div></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let jogos=[];
+async function post(u,b){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});const j=await r.json();if(!r.ok)throw new Error(j.erro||'Erro');return j}
+async function poll(job,barId,msgId){const bar=$(barId);bar.style.display='block';
+ while(true){const j=await (await fetch('/api/job/'+job)).json();
+  bar.firstElementChild.style.width=(j.progress*100)+'%';$(msgId).textContent=j.msg;
+  if(j.status==='done'){return j.result}if(j.status==='error')throw new Error(j.msg);
+  await new Promise(r=>setTimeout(r,800))}}
+const pct=(x,d=1)=>(x*100).toFixed(d).replace('.',',')+'%';
+const fm=x=>'R$ '+x.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+$('bUp').onclick=async()=>{const f=$('arq').files[0];if(!f){$('mUp').textContent='Escolha um arquivo.';return}
+ const fd=new FormData();fd.append('arquivo',f);$('bUp').disabled=true;$('mUp').className='msg';$('mUp').textContent='Lendo e preparando atributos...';
+ try{const r=await fetch('/api/upload',{method:'POST',body:fd});const j=await r.json();if(!r.ok)throw new Error(j.erro);
+  $('mUp').textContent='Arquivo importado.';
+  $('infoUp').innerHTML=`<div class="kv"><div><b>${j.concursos}</b><span>concursos válidos</span></div><div><b>${j.primeiro}–${j.ultimo}</b><span>${j.data_inicio||''} a ${j.data_fim||''}</span></div><div><b>${j.ultimo_sorteio.map(n=>'<span class="ball" style="width:26px;height:26px;line-height:26px;font-size:12px">'+String(n).padStart(2,'0')+'</span>').join('')}</b><span>último sorteio</span></div><div><b>${j.premios?'sim':'não'}</b><span>rateios para ROI</span></div></div>`;
+  ['bTr','bPr','bBt'].forEach(i=>$(i).disabled=false);
+ }catch(e){$('mUp').className='msg err';$('mUp').textContent=e.message}$('bUp').disabled=false};
+
+function bars(cv,vals,base){const c=$(cv),x=c.getContext('2d'),W=c.width=c.clientWidth*2,H=c.height=400;x.clearRect(0,0,W,H);
+ const mx=Math.max(...vals,base)*1.15,mn=Math.min(...vals,base)*0.85,pad=34,bw=(W-pad*2)/vals.length;
+ x.fillStyle='#4c8dff';vals.forEach((v,i)=>{const h=(v-mn)/(mx-mn)*(H-60);x.fillRect(pad+i*bw+2,H-30-h,bw-4,h)});
+ x.strokeStyle='#e0a82e';x.setLineDash([8,6]);x.lineWidth=2;const y=H-30-(base-mn)/(mx-mn)*(H-60);x.beginPath();x.moveTo(pad,y);x.lineTo(W-pad,y);x.stroke();
+ x.setLineDash([]);x.fillStyle='#8b98a8';x.font='20px Arial';vals.forEach((v,i)=>{if(i%5==4||i==0)x.fillText(i+1,pad+i*bw,H-8)});x.fillText('10% (acaso)',W-pad-130,y-8)}
+function lines(cv,series){const c=$(cv),x=c.getContext('2d'),W=c.width=c.clientWidth*2,H=c.height=400;x.clearRect(0,0,W,H);
+ const all=series.flatMap(s=>s.d),mx=Math.max(...all,0),mn=Math.min(...all,0),pad=60;
+ const Y=v=>H-30-(v-mn)/((mx-mn)||1)*(H-60);
+ x.strokeStyle='#2a3441';x.beginPath();x.moveTo(pad,Y(0));x.lineTo(W-10,Y(0));x.stroke();
+ series.forEach(s=>{x.strokeStyle=s.c;x.lineWidth=3;x.beginPath();s.d.forEach((v,i)=>{const px=pad+i/(s.d.length-1)*(W-pad-10);i?x.lineTo(px,Y(v)):x.moveTo(px,Y(v))});x.stroke()});
+ x.fillStyle='#8b98a8';x.font='20px Arial';x.fillText('R$ '+Math.round(mx),4,24);x.fillText('R$ '+Math.round(mn),4,H-8)}
+
+$('bTr').onclick=async()=>{$('bTr').disabled=true;$('resTr').innerHTML='';$('mTr').className='msg';
+ try{const {job}=await post('/api/train',{modelo:$('modelo').value,arvores:+$('arvores').value,holdout:+$('holdout').value});
+  const r=await poll(job,'barTr','mTr');const e=r.avaliacao;
+  let imp='';if(r.importancia){const m=Math.max(...Object.values(r.importancia));imp='<h2 style="margin-top:16px">Importância dos atributos</h2>'+Object.entries(r.importancia).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v])=>`<div class="imp"><span>${k}</span><i style="width:${v/m*100}%"></i><span>${pct(v)}</span></div>`).join('')+'<div class="small">Importância mostra onde o modelo ajustou ruído; não indica poder preditivo.</div>'}
+  $('resTr').innerHTML=`<div class="kv"><div><b>${e.auc.toFixed(4)}</b><span>AUC (0,5 = acaso)</span></div><div><b>${e.auc_perm_p95.toFixed(4)}</b><span>AUC máx. esperado por acaso (p95)</span></div><div><b>${e.acertos_top6.toFixed(3)}</b><span>acertos médios no top-6 (acaso: 0,600)</span></div><div><b>${e.p_valor.toFixed(3)}</b><span>p-valor (acertos vs. 0,6)</span></div></div>
+  <span class="badge ${e.sinal?'b-ok':'b-no'}">${e.sinal?'Sinal estatístico detectado — confirme com cautela (vários testes)':'Sem evidência de que o modelo supera o acaso'}</span>
+  <div class="small" style="margin:8px 0">Validação em ${e.n_teste} concursos que ficaram fora do treino.</div>
+  <h2 style="margin-top:12px">Probabilidade estimada por dezena (próximo concurso)</h2><canvas id="cvP"></canvas>
+  <div class="small">Linha tracejada = 10% (probabilidade teórica de cada dezena).</div>${imp}`;
+  bars('cvP',r.probs.map(p=>p/r.probs.reduce((a,b)=>a+b)*6),0.1);
+ }catch(e){$('mTr').className='msg err';$('mTr').textContent=e.message}$('bTr').disabled=false};
+
+$('bPr').onclick=async()=>{try{const r=await post('/api/predict',{quantidade:+$('qtd').value,intensidade:+$('int').value,soma_min:+$('smin').value,soma_max:+$('smax').value,par_min:+$('pmin').value,par_max:+$('pmax').value,semente:$('seed').value});
+ jogos=r.jogos;['bCsv','bXls','bCp'].forEach(i=>$(i).disabled=!jogos.length);
+ $('resPr').innerHTML=`<div class="small" style="margin-bottom:6px">${r.gerados} de ${r.solicitados} jogos · ${r.usou_modelo?'baseado no modelo treinado':'aleatório (modelo não treinado)'} · soma entre ${Math.round(r.faixa_soma[0])} e ${Math.round(r.faixa_soma[1])}${r.gerados<r.solicitados?' · <span class="err">filtros muito restritivos</span>':''}</div><table><tr><th>#</th><th>Dezenas</th><th>Soma</th><th>Pares</th><th>Quadrantes</th><th>Score</th></tr>${jogos.map((g,i)=>`<tr><td>${i+1}</td><td>${g.dezenas.map(n=>`<span class="ball">${String(n).padStart(2,'0')}</span>`).join('')}</td><td>${g.soma}</td><td>${g.pares}/${6-g.pares}</td><td>${g.quadrantes.join(' · ')}</td><td>${g.score.toFixed(3)}</td></tr>`).join('')}</table>`;
+ }catch(e){$('resPr').innerHTML='<span class="err">'+e.message+'</span>'}};
+const txt=()=>jogos.map(g=>g.dezenas.map(n=>String(n).padStart(2,'0')).join(' ')).join('\n');
+$('bCp').onclick=()=>navigator.clipboard.writeText(txt());
+$('bCsv').onclick=()=>{const b=new Blob(['jogo;d1;d2;d3;d4;d5;d6;soma;pares\n'+jogos.map((g,i)=>[i+1,...g.dezenas,g.soma,g.pares].join(';')).join('\n')],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='previsoes_megasena.csv';a.click()};
+$('bXls').onclick=()=>location.href='/api/export.xlsx';
+
+$('bBt').onclick=async()=>{$('bBt').disabled=true;$('resBt').innerHTML='';$('mBt').className='msg';
+ try{const {job}=await post('/api/backtest',{modelo:$('bmodelo').value,anos:+$('anos').value,jogos:+$('jogos').value,preco:+$('preco').value,semente:+$('bseed').value||7,intensidade:+$('int').value,soma_min:+$('smin').value,soma_max:+$('smax').value,par_min:+$('pmin').value,par_max:+$('pmax').value});
+  const r=await poll(job,'barBt','mBt'),m=r.modelo,a=r.aleatorio,d=r.aleatorio_dist;
+  const row=(n,x)=>`<tr><td>${n}</td><td>${fm(x.investido)}</td><td>${fm(x.retorno)}</td><td><b>${x.roi.toFixed(1).replace('.',',')}%</b></td><td>${x.dist.slice(3).join(' / ')}</td></tr>`;
+  $('resBt').innerHTML=`<div class="small">${r.n_concursos} concursos desde ${r.inicio} · ${r.jogos_por_concurso} jogos/concurso · R$ ${r.preco.toFixed(2)} por jogo${r.tem_premios?'':' · <span class="err">planilha sem rateios: ROI não calculável</span>'}</div>
+  <table><tr><th>Estratégia</th><th>Investido</th><th>Retorno</th><th>ROI</th><th>Jogos com 3/4/5/6 acertos</th></tr>${row('Modelo + filtros',m)}${row('Aleatório (1 simulação)',a)}</table>
+  <div class="kv"><div><b>${d.p5.toFixed(0)}% a ${d.p95.toFixed(0)}%</b><span>faixa do ROI de 40 simulações aleatórias (p5–p95)</span></div><div><b>${r.teste_acertos.obs_4mais} (esperado ${r.teste_acertos.esp_4mais.toFixed(1).replace('.',',')})</b><span>jogos com 4+ acertos · p = ${r.teste_acertos.p_valor_4mais.toFixed(2).replace('.',',')}</span></div><div><b>${m.premios_altos}</b><span>jogos do modelo com quina/sena</span></div></div>
+  <canvas id="cvB"></canvas><div class="small"><span style="color:#2ea36b">■</span> modelo &nbsp; <span style="color:#8b98a8">■</span> aleatório · lucro acumulado (R$)</div>
+  <div class="small" style="margin-top:6px">Acertos esperados ao acaso (3/4/5/6): ${r.teste_acertos.esperado.slice(3).map(v=>v.toFixed(v<1?2:1).replace('.',',')).join(' / ')}. p alto = o modelo não difere do acaso. <b>Troque a semente e rode de novo</b>: se o p oscila (ex.: 0,02 → 0,4 → 0,8), o resultado é sorte de amostragem.</div><div class="small" style="margin-top:6px">Se o ROI do modelo for positivo, olhe os "jogos com quina/sena": um único prêmio alto (probabilidade de ~${(r.prob_quina_por_jogo*100000).toFixed(2).replace('.',',')} em 100 mil por jogo) basta para isso e é sorte, não habilidade.</div>`;
+  lines('cvB',[{d:m.curva,c:'#2ea36b'},{d:a.curva,c:'#8b98a8'}]);
+ }catch(e){$('mBt').className='msg err';$('mBt').textContent=e.message}$('bBt').disabled=false};
+</script></body></html>

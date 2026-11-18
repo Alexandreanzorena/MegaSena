@@ -1,0 +1,20 @@
+MEGA-SENA LAB - app de estudo (Flask + scikit-learn)
+
+WINDOWS
+1. Instale o Python 3.10+ (marque "Add to PATH").
+2. Dê dois cliques em iniciar.bat (instala as bibliotecas e abre http://127.0.0.1:8000).
+   Ou: pip install -r requirements.txt  e  python app.py
+
+GOOGLE COLAB
+1. Envie a pasta megasena_app para /content.
+2. Célula 1:  !pip -q install flask openpyxl
+3. Célula 2:  %run /content/megasena_app/colab_run.py   (abre o app em nova janela)
+
+USO
+1. Importar: envie o Mega-Sena.xlsx (colunas Bola1..Bola6; Concurso, Data e Rateio 4/5/6 acertos são opcionais).
+2. Treinar: escolha Random Forest ou rede neural; o app valida em concursos fora do treino
+   (AUC vs. embaralhamento, acertos no top-6 vs. 0,6 esperado) e diz se há ou não evidência acima do acaso.
+3. Gerar previsões: defina a quantidade (1-1000), filtros de soma/paridade, intensidade e semente. Exporta CSV/XLSX.
+4. Backtest: simula N anos de apostas e compara o ROI com estratégias aleatórias.
+
+ATENÇÃO: a Mega-Sena é aleatória e independente. Os jogos gerados são para estudo, não aumentam a chance de ganhar.

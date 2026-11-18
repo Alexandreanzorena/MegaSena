@@ -1,0 +1,3 @@
+Como rodar
+Windows: descompacte e dê dois cliques em iniciar.bat. Ele instala as bibliotecas e abre http://127.0.0.1:8000.
+Colab: envie a pasta para /content, rode !pip -q install flask openpyxl e depois %run /content/megasena_app/colab_run.py.
